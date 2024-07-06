@@ -7,24 +7,64 @@ const Player = struct {
     speed: f32,
     pos: Vector2,
 
-    pub fn move(self: *Player, direction: Vector2, frametime: f32) void {
-        self.pos = self.pos.add(.{
-            .x = self.speed * direction.x * frametime,
-            .y = self.speed * direction.y * frametime,
-        });
+    pub fn update(self: *Player, frametime: f32) void {
+        self.pos = getDirection()
+            .scale(self.speed)
+            .scale(frametime)
+            .add(self.pos);
+    }
+
+    pub fn draw(self: *Player) void {
+        rl.drawRectangleV(
+            self.pos.subtractValue(50),
+            Vector2.init(100, 100),
+            Color.blue,
+        );
     }
 };
 
 const Projectile = struct {
     speed: f32,
+    size: f32,
+    rotation: f32 = 0,
     pos: Vector2,
-    dir: Vector2,
+    dir: Vector2 = .{ .x = 0, .y = 0 },
 
-    pub fn move(self: *Projectile, frametime: f32) void {
-        self.pos = self.pos.add(.{
-            .x = self.speed * self.dir.x * frametime,
-            .y = self.speed * self.dir.y * frametime,
-        });
+    pub fn update(self: *Projectile, frametime: f32) void {
+        self.pos = self.dir
+            .scale(self.speed)
+            .scale(frametime)
+            .add(self.pos);
+
+        self.rotation = self.rotation + 30;
+    }
+
+    var rng = std.rand.DefaultPrng.init(0);
+
+    pub fn draw(self: *Projectile) void {
+        const spawnPoint = self.pos
+            .subtractValue(self.size / 2)
+            .add(Vector2.init(
+            rng.random().float(f32) * 50,
+            rng.random().float(f32) * 50,
+        ));
+
+        const rect = rl.Rectangle.init(spawnPoint.x, spawnPoint.y, self.size, self.size);
+
+        rl.drawRectanglePro(
+            rect,
+            .{
+                .x = rect.width / 2,
+                .y = rect.height / 2,
+            },
+            self.rotation,
+            .{
+                .r = @intCast(rl.getRandomValue(0, 255)),
+                .g = @intCast(rl.getRandomValue(0, 255)),
+                .b = @intCast(rl.getRandomValue(0, 255)),
+                .a = 255,
+            },
+        );
     }
 };
 
@@ -44,40 +84,36 @@ pub fn main() !void {
 
     var player = Player{
         .speed = 800,
-        .pos = .{ .x = 300, .y = 300 },
+        .pos = Vector2.init(100, 100),
     };
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
+
     const allocator = arena.allocator();
     var projectiles = std.ArrayList(Projectile).init(allocator);
 
     while (!rl.windowShouldClose()) {
         rl.beginDrawing();
         defer rl.endDrawing();
+
         rl.clearBackground(rl.Color.black);
+        rl.drawText(rl.textFormat("%d", .{rl.getFPS()}), 0, 0, 18, Color.green);
 
-        const fps = try std.fmt.allocPrint(allocator, "{}", .{rl.getFPS()});
-        rl.drawText(@ptrCast(fps), 0, 0, 18, Color.green);
+        const frametime = rl.getFrameTime();
 
-        const direction = getDirection();
+        player.update(frametime);
+        player.draw();
 
-        player.move(direction, rl.getFrameTime());
-
-        rl.drawRectangleV(
-            player.pos,
-            Vector2.init(100, 100),
-            Color.blue,
-        );
-
-        for (projectiles.items) |*item| {
-            item.move(rl.getFrameTime());
-            rl.drawCircleV(item.pos, 30, Color.red);
+        for (projectiles.items) |*projectile| {
+            projectile.update(frametime);
+            projectile.draw();
         }
 
         if (rl.isMouseButtonDown(.mouse_button_left)) {
             try projectiles.append(.{
-                .speed = 1600,
+                .speed = 800,
+                .size = @floatFromInt(rl.getRandomValue(5, 30)),
                 .pos = player.pos,
                 .dir = rl
                     .getMousePosition()
