@@ -1,15 +1,14 @@
 const std = @import("std");
-const rl = @cImport({
-    @cInclude("raylib.h");
-    @cInclude("raymath.h");
-});
+const rl = @import("raylib");
+const Vector2 = rl.Vector2;
+const Color = rl.Color;
 
 const Player = struct {
     speed: f32,
-    pos: rl.Vector2,
+    pos: Vector2,
 
-    pub fn move(self: *Player, direction: rl.Vector2, frametime: f32) void {
-        self.pos = rl.Vector2Add(self.pos, rl.Vector2{
+    pub fn move(self: *Player, direction: Vector2, frametime: f32) void {
+        self.pos = self.pos.add(.{
             .x = self.speed * direction.x * frametime,
             .y = self.speed * direction.y * frametime,
         });
@@ -18,21 +17,30 @@ const Player = struct {
 
 const Projectile = struct {
     speed: f32,
-    pos: rl.Vector2,
-    dir: rl.Vector2,
+    pos: Vector2,
+    dir: Vector2,
 
     pub fn move(self: *Projectile, frametime: f32) void {
-        self.pos = rl.Vector2Add(self.pos, rl.Vector2{
+        self.pos = self.pos.add(.{
             .x = self.speed * self.dir.x * frametime,
             .y = self.speed * self.dir.y * frametime,
         });
     }
 };
 
+pub fn getDirection() Vector2 {
+    var v = Vector2.zero();
+    if (rl.isKeyDown(.key_w)) v.y = v.y - 1;
+    if (rl.isKeyDown(.key_a)) v.x = v.x - 1;
+    if (rl.isKeyDown(.key_s)) v.y = v.y + 1;
+    if (rl.isKeyDown(.key_d)) v.x = v.x + 1;
+    return v;
+}
+
 pub fn main() !void {
     std.debug.print("Hello World!", .{});
-    rl.InitWindow(1280, 720, "Test");
-    rl.SetTargetFPS(120);
+    rl.initWindow(1280, 720, "Test");
+    rl.setTargetFPS(120);
 
     var player = Player{
         .speed = 800,
@@ -44,45 +52,37 @@ pub fn main() !void {
     const allocator = arena.allocator();
     var projectiles = std.ArrayList(Projectile).init(allocator);
 
-    while (!rl.WindowShouldClose()) {
-        rl.BeginDrawing();
-        defer rl.EndDrawing();
-        rl.ClearBackground(rl.BLACK);
+    while (!rl.windowShouldClose()) {
+        rl.beginDrawing();
+        defer rl.endDrawing();
+        rl.clearBackground(rl.Color.black);
 
-        const fps = try std.fmt.allocPrint(allocator, "{}", .{rl.GetFPS()});
-        rl.DrawText(@ptrCast(fps), 0, 0, 12, rl.GREEN);
+        const fps = try std.fmt.allocPrint(allocator, "{}", .{rl.getFPS()});
+        rl.drawText(@ptrCast(fps), 0, 0, 18, Color.green);
 
-        var direction = rl.Vector2{ .x = 0, .y = 0 };
-        if (rl.IsKeyDown(rl.KEY_W)) {
-            direction.y = direction.y - 1;
-        }
-        if (rl.IsKeyDown(rl.KEY_A)) {
-            direction.x = direction.x - 1;
-        }
-        if (rl.IsKeyDown(rl.KEY_S)) {
-            direction.y = direction.y + 1;
-        }
-        if (rl.IsKeyDown(rl.KEY_D)) {
-            direction.x = direction.x + 1;
-        }
+        const direction = getDirection();
 
-        player.move(direction, rl.GetFrameTime());
+        player.move(direction, rl.getFrameTime());
 
-        rl.DrawRectangleV(player.pos, rl.Vector2{ .x = 100, .y = 100 }, rl.BLUE);
+        rl.drawRectangleV(
+            player.pos,
+            Vector2.init(100, 100),
+            Color.blue,
+        );
 
         for (projectiles.items) |*item| {
-            item.move(rl.GetFrameTime());
-            rl.DrawCircleV(item.pos, 30, rl.RED);
+            item.move(rl.getFrameTime());
+            rl.drawCircleV(item.pos, 30, Color.red);
         }
 
-        if (rl.IsMouseButtonDown(rl.MOUSE_BUTTON_LEFT)) {
+        if (rl.isMouseButtonDown(.mouse_button_left)) {
             try projectiles.append(.{
                 .speed = 1600,
                 .pos = player.pos,
-                .dir = rl.Vector2Normalize(rl.Vector2Subtract(
-                    rl.GetMousePosition(),
-                    player.pos,
-                )),
+                .dir = rl
+                    .getMousePosition()
+                    .subtract(player.pos)
+                    .normalize(),
             });
         }
     }
