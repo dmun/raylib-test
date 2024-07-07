@@ -6,12 +6,24 @@ const Color = rl.Color;
 const Player = struct {
     speed: f32,
     pos: Vector2,
+    force: Vector2 = .{ .x = 0, .y = 0 },
 
     pub fn update(self: *Player, frametime: f32) void {
         self.pos = getDirection()
             .scale(self.speed)
             .scale(frametime)
+            .add(self.force)
             .add(self.pos);
+
+        if (self.force.distance(Vector2.zero()) > 0.1) {
+            self.force = self.force.scale(0.8);
+        } else {
+            self.force = Vector2.zero();
+        }
+
+        if (rl.isKeyPressed(.key_space)) {
+            self.force = getDirection().scale(100);
+        }
     }
 
     pub fn draw(self: *Player) void {
@@ -20,7 +32,6 @@ const Player = struct {
             Vector2.init(100, 100),
             Color.ray_white,
         );
-        rl.drawPixelV(self.pos, Color.red);
     }
 };
 
@@ -81,33 +92,39 @@ pub fn getDirection() Vector2 {
 }
 
 pub fn drawGrid() void {
-    const width = 10;
-    const height = 10;
-    const size = 5;
-    const spacing = 500;
+    const width = 100;
+    const height = 100;
+    const size = 100;
+    const spacing = 2;
 
     for (0..width) |x| {
         for (0..height) |y| {
-            rl.drawCircle(
+            rl.drawRectangle(
                 @intCast(x * (size + spacing)),
                 @intCast(y * (size + spacing)),
                 size,
-                Color.gray,
+                size,
+                .{
+                    .r = @intCast(@divTrunc(x * 255, width)),
+                    .g = @intCast(@divTrunc(y * 255, height)),
+                    .b = 255,
+                    .a = 69,
+                },
             );
         }
     }
 }
 
 pub fn main() !void {
-    std.debug.print("Hello World!", .{});
     rl.initWindow(1280, 720, "Test");
     rl.setTargetFPS(144);
 
     var player = Player{
         .speed = 800,
-        .pos = Vector2.init(800, 800),
+        .pos = Vector2.init(3600, 3600),
     };
 
+    const screenScaling = @as(f32, @floatFromInt(rl.getScreenHeight())) / 1080;
     var camera = rl.Camera2D{
         .target = Vector2.zero(),
         .offset = Vector2.init(
@@ -115,7 +132,7 @@ pub fn main() !void {
             @as(f32, @floatFromInt(rl.getScreenHeight())) / 2,
         ),
         .rotation = 0,
-        .zoom = 1,
+        .zoom = screenScaling,
     };
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -128,8 +145,8 @@ pub fn main() !void {
         rl.beginDrawing();
         defer rl.endDrawing();
 
-        rl.clearBackground(rl.Color.black);
-        defer rl.drawCircleV(rl.getMousePosition(), 10, Color.green);
+        rl.clearBackground(Color.black.brightness(0.1));
+        // defer rl.drawCircleV(rl.getMousePosition(), 10, Color.green);
         defer rl.drawText(rl.textFormat("%d", .{rl.getFPS()}), 0, 0, 18, Color.green);
 
         const frametime = rl.getFrameTime();
