@@ -138,7 +138,7 @@ const Crosshair = struct {
             self.color,
         );
         rl.drawRectangle(
-            posX + self.gap,
+            posX + self.gap + @mod(self.thickness, 2),
             posY - @divTrunc(self.thickness, 2),
             self.length,
             self.thickness,
@@ -173,7 +173,7 @@ pub fn main() !void {
 
     const crosshair = Crosshair{
         .length = 8,
-        .thickness = 2,
+        .thickness = 3,
         .gap = 4,
         .color = Color.green,
     };
@@ -183,6 +183,17 @@ pub fn main() !void {
 
     const allocator = arena.allocator();
     var projectiles = std.ArrayList(Projectile).init(allocator);
+
+    var cubes = std.ArrayList(Vector3).init(allocator);
+    for (0..100) |_| {
+        try cubes.append(
+            Vector3.init(
+                @floatFromInt(rl.getRandomValue(-500, 500)),
+                @floatFromInt(rl.getRandomValue(0, 500)),
+                @floatFromInt(rl.getRandomValue(-500, 500)),
+            ),
+        );
+    }
 
     while (!rl.windowShouldClose()) {
         rl.beginDrawing();
@@ -199,13 +210,8 @@ pub fn main() !void {
         const frametime = rl.getFrameTime();
 
         player.update(frametime);
-        rl.drawCube(Vector3.zero(), 300, 300, 300, Color.white);
 
         const mouseDelta = rl.getMouseDelta().scale(0.5);
-
-        if (mouseDelta.length() > 0) {
-            std.debug.print("{}\n", .{mouseDelta});
-        }
 
         const direction = getDirection();
         camera.update(.camera_custom);
@@ -220,7 +226,11 @@ pub fn main() !void {
         camera.begin();
         defer camera.end();
 
-        rl.drawGrid(300, 10);
+        rl.drawGrid(100, 10);
+        rl.drawPlane(Vector3.zero(), Vector2.one().scale(1000), Color.black.brightness(0.2));
+        for (cubes.items) |cube| {
+            rl.drawCube(cube, 30, 30, 30, Color.white);
+        }
 
         drawGrid();
 
