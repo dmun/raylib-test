@@ -156,12 +156,7 @@ const Crosshair = struct {
 
 pub fn main() !void {
     rl.initWindow(1280, 720, "Test");
-    rl.setTargetFPS(144);
-
-    var player = Player{
-        .speed = 800,
-        .pos = Vector2.init(3600, 3600),
-    };
+    rl.setTargetFPS(240);
 
     var camera = rl.Camera3D{
         .position = Vector3.init(0, 1, 1),
@@ -182,8 +177,6 @@ pub fn main() !void {
     defer arena.deinit();
 
     const allocator = arena.allocator();
-    var projectiles = std.ArrayList(Projectile).init(allocator);
-
     var cubes = std.ArrayList(Vector3).init(allocator);
     for (0..100) |_| {
         try cubes.append(
@@ -195,24 +188,17 @@ pub fn main() !void {
         );
     }
 
+    const crossW = @divTrunc(rl.getScreenWidth(), 2);
+    const crossH = @divTrunc(rl.getScreenHeight(), 2);
+
     while (!rl.windowShouldClose()) {
         rl.beginDrawing();
         defer rl.endDrawing();
 
         rl.clearBackground(Color.black.brightness(0.1));
-        // defer rl.drawCircleV(rl.getMousePosition(), 10, Color.green);
-        defer rl.drawText(rl.textFormat("%d", .{rl.getFPS()}), 0, 0, 18, Color.green);
-        const crossW = @divTrunc(rl.getScreenWidth(), 2);
-        const crossH = @divTrunc(rl.getScreenHeight(), 2);
 
-        defer crosshair.draw(crossW, crossH);
-
-        const frametime = rl.getFrameTime();
-
-        player.update(frametime);
-
-        const mouseDelta = rl.getMouseDelta().scale(0.5);
-
+        // Camera
+        const mouseDelta = rl.getMouseDelta().scale(0.05);
         const direction = getDirection();
         camera.update(.camera_custom);
         rl.updateCameraPro(
@@ -221,8 +207,13 @@ pub fn main() !void {
             Vector3.init(mouseDelta.x, mouseDelta.y, 0),
             0,
         );
-        defer rl.disableCursor();
+        rl.disableCursor();
 
+        // UI
+        defer rl.drawText(rl.textFormat("%d", .{rl.getFPS()}), 0, 0, 18, Color.green);
+        defer crosshair.draw(crossW, crossH);
+
+        // Scene
         camera.begin();
         defer camera.end();
 
@@ -230,29 +221,6 @@ pub fn main() !void {
         rl.drawPlane(Vector3.zero(), Vector2.one().scale(1000), Color.black.brightness(0.2));
         for (cubes.items) |cube| {
             rl.drawCube(cube, 30, 30, 30, Color.white);
-        }
-
-        drawGrid();
-
-        player.draw();
-
-        for (projectiles.items) |*projectile| {
-            projectile.update(frametime);
-            projectile.draw();
-        }
-
-        if (rl.isMouseButtonDown(.mouse_button_left)) {
-            try projectiles.append(.{
-                .speed = 1600,
-                .size = @floatFromInt(rl.getRandomValue(5, 30)),
-                .pos = player.pos,
-                .dir = rl
-                    .getMousePosition()
-                // .add(camera.target)
-                    .subtract(player.pos)
-                // .subtract(camera.offset)
-                    .normalize(),
-            });
         }
     }
 }
