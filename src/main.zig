@@ -191,11 +191,19 @@ pub fn main() !void {
     const crossW = @divTrunc(rl.getScreenWidth(), 2);
     const crossH = @divTrunc(rl.getScreenHeight(), 2);
 
+    const testShader = rl.loadShader(
+        "src/test_vert.glsl",
+        "src/test_frag.glsl",
+    );
+
     while (!rl.windowShouldClose()) {
         rl.beginDrawing();
         defer rl.endDrawing();
 
         rl.clearBackground(Color.black.brightness(0.1));
+        rl.beginShaderMode(testShader);
+        rl.drawRectangle(0, 0, rl.getScreenWidth(), rl.getScreenHeight(), Color.white);
+        rl.endShaderMode();
 
         // Camera
         const mouseDelta = rl.getMouseDelta().scale(0.05);
