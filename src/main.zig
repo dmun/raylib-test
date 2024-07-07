@@ -18,32 +18,40 @@ const Player = struct {
         rl.drawRectangleV(
             self.pos.subtractValue(50),
             Vector2.init(100, 100),
-            Color.blue,
+            Color.ray_white,
         );
+        rl.drawPixelV(self.pos, Color.red);
     }
 };
+
+pub fn randomColor() Color {
+    return .{
+        .r = @intCast(rl.getRandomValue(0, 255)),
+        .g = @intCast(rl.getRandomValue(0, 255)),
+        .b = @intCast(rl.getRandomValue(0, 255)),
+        .a = 255,
+    };
+}
 
 const Projectile = struct {
     speed: f32,
     size: f32,
     rotation: f32 = 0,
     pos: Vector2,
-    dir: Vector2 = .{ .x = 0, .y = 0 },
+    dir: Vector2,
 
     pub fn update(self: *Projectile, frametime: f32) void {
         self.pos = self.dir
             .scale(self.speed)
             .scale(frametime)
             .add(self.pos);
-
-        self.rotation = self.rotation + 30;
     }
 
     var rng = std.rand.DefaultPrng.init(0);
 
     pub fn draw(self: *Projectile) void {
         const spawnPoint = self.pos
-            .subtractValue(self.size / 2)
+            .subtractValue(25)
             .add(Vector2.init(
             rng.random().float(f32) * 50,
             rng.random().float(f32) * 50,
@@ -58,12 +66,7 @@ const Projectile = struct {
                 .y = rect.height / 2,
             },
             self.rotation,
-            .{
-                .r = @intCast(rl.getRandomValue(0, 255)),
-                .g = @intCast(rl.getRandomValue(0, 255)),
-                .b = @intCast(rl.getRandomValue(0, 255)),
-                .a = 255,
-            },
+            randomColor(),
         );
     }
 };
@@ -77,14 +80,42 @@ pub fn getDirection() Vector2 {
     return v;
 }
 
+pub fn drawGrid() void {
+    const width = 10;
+    const height = 10;
+    const size = 5;
+    const spacing = 500;
+
+    for (0..width) |x| {
+        for (0..height) |y| {
+            rl.drawCircle(
+                @intCast(x * (size + spacing)),
+                @intCast(y * (size + spacing)),
+                size,
+                Color.gray,
+            );
+        }
+    }
+}
+
 pub fn main() !void {
     std.debug.print("Hello World!", .{});
     rl.initWindow(1280, 720, "Test");
-    rl.setTargetFPS(120);
+    rl.setTargetFPS(144);
 
     var player = Player{
         .speed = 800,
-        .pos = Vector2.init(100, 100),
+        .pos = Vector2.init(800, 800),
+    };
+
+    var camera = rl.Camera2D{
+        .target = Vector2.zero(),
+        .offset = Vector2.init(
+            @as(f32, @floatFromInt(rl.getScreenWidth())) / 2,
+            @as(f32, @floatFromInt(rl.getScreenHeight())) / 2,
+        ),
+        .rotation = 0,
+        .zoom = 1,
     };
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -98,11 +129,19 @@ pub fn main() !void {
         defer rl.endDrawing();
 
         rl.clearBackground(rl.Color.black);
-        rl.drawText(rl.textFormat("%d", .{rl.getFPS()}), 0, 0, 18, Color.green);
+        defer rl.drawCircleV(rl.getMousePosition(), 10, Color.green);
+        defer rl.drawText(rl.textFormat("%d", .{rl.getFPS()}), 0, 0, 18, Color.green);
 
         const frametime = rl.getFrameTime();
 
         player.update(frametime);
+        camera.target = player.pos;
+
+        camera.begin();
+        defer camera.end();
+
+        drawGrid();
+
         player.draw();
 
         for (projectiles.items) |*projectile| {
@@ -112,12 +151,14 @@ pub fn main() !void {
 
         if (rl.isMouseButtonDown(.mouse_button_left)) {
             try projectiles.append(.{
-                .speed = 800,
+                .speed = 1600,
                 .size = @floatFromInt(rl.getRandomValue(5, 30)),
                 .pos = player.pos,
                 .dir = rl
                     .getMousePosition()
+                    .add(camera.target)
                     .subtract(player.pos)
+                    .subtract(camera.offset)
                     .normalize(),
             });
         }
