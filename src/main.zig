@@ -155,6 +155,10 @@ const Crosshair = struct {
 };
 
 pub fn main() !void {
+    rl.setConfigFlags(.{
+        .msaa_4x_hint = true,
+    });
+
     rl.initWindow(1280, 720, "Test");
     rl.setTargetFPS(240);
 
