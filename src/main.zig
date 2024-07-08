@@ -160,7 +160,7 @@ pub fn main() !void {
 
     var camera = rl.Camera3D{
         .position = Vector3.init(0, 1, 1),
-        .target = Vector3.zero(),
+        .target = Vector3.init(0, 1, 20),
         .up = Vector3.init(0, 1, 0),
         .fovy = 90,
         .projection = .camera_perspective,
@@ -191,23 +191,38 @@ pub fn main() !void {
     const crossW = @divTrunc(rl.getScreenWidth(), 2);
     const crossH = @divTrunc(rl.getScreenHeight(), 2);
 
-    const testShader = rl.loadShader(
-        "src/test_vert.glsl",
-        "src/test_frag.glsl",
-    );
+    const testShader = rl.loadShader("src/test_vert.glsl", "src/test_frag.glsl");
+    defer rl.unloadShader(testShader);
+
+    const target = rl.loadRenderTexture(rl.getScreenWidth(), rl.getScreenHeight());
+    defer target.unload();
 
     while (!rl.windowShouldClose()) {
         rl.beginDrawing();
         defer rl.endDrawing();
 
         rl.clearBackground(Color.black.brightness(0.1));
-        rl.beginShaderMode(testShader);
-        rl.drawRectangle(0, 0, rl.getScreenWidth(), rl.getScreenHeight(), Color.white);
-        rl.endShaderMode();
+
+        {
+            testShader.activate();
+            defer testShader.deactivate();
+
+            rl.drawTextureRec(
+                target.texture,
+                .{
+                    .x = 0,
+                    .y = 0,
+                    .width = @floatFromInt(target.texture.width),
+                    .height = @floatFromInt(-target.texture.height),
+                },
+                Vector2.zero(),
+                Color.white,
+            );
+        }
 
         // Camera
         const mouseDelta = rl.getMouseDelta().scale(0.05);
-        const direction = getDirection();
+        const direction = getDirection().scale(0.5);
         camera.update(.camera_custom);
         rl.updateCameraPro(
             &camera,
@@ -218,7 +233,7 @@ pub fn main() !void {
         rl.disableCursor();
 
         // UI
-        defer rl.drawText(rl.textFormat("%d", .{rl.getFPS()}), 0, 0, 18, Color.green);
+        defer rl.drawFPS(0, 0);
         defer crosshair.draw(crossW, crossH);
 
         // Scene
