@@ -154,6 +154,19 @@ const Crosshair = struct {
     }
 };
 
+const Particle = struct {
+    position: Vector3,
+    direction: Vector3,
+
+    pub fn update(self: *Particle) void {
+        self.position = self.position.add(self.direction);
+    }
+
+    pub fn draw(self: *Particle) void {
+        rl.drawCubeV(self.position, Vector3.one(), Color.white);
+    }
+};
+
 pub fn main() !void {
     rl.setConfigFlags(.{
         .msaa_4x_hint = true,
@@ -191,6 +204,8 @@ pub fn main() !void {
             ),
         );
     }
+
+    var particles = std.ArrayList(Particle).init(allocator);
 
     const crossW = @divTrunc(rl.getScreenWidth(), 2);
     const crossH = @divTrunc(rl.getScreenHeight(), 2);
@@ -248,6 +263,18 @@ pub fn main() !void {
         rl.drawPlane(Vector3.zero(), Vector2.one().scale(1000), Color.black.brightness(0.2));
         for (cubes.items) |cube| {
             rl.drawCube(cube, 30, 30, 30, Color.white);
+        }
+
+        for (particles.items) |*particle| {
+            particle.update();
+            particle.draw();
+        }
+
+        if (rl.isMouseButtonPressed(.mouse_button_left)) {
+            try particles.append(.{
+                .position = camera.position,
+                .direction = Vector3.one(),
+            });
         }
     }
 }
