@@ -3,36 +3,38 @@ const rl = @import("raylib");
 const Vector2 = rl.Vector2;
 const Vector3 = rl.Vector3;
 const Color = rl.Color;
+const Quaternion = rl.Quaternion;
+const Ray = rl.Ray;
 
 const Player = struct {
     speed: f32,
-    pos: Vector2,
-    force: Vector2 = .{ .x = 0, .y = 0 },
+    pos: Vector3,
+    force: Vector3,
 
     pub fn update(self: *Player, frametime: f32) void {
-        self.pos = getDirection()
+        const dir = getDirection();
+        self.pos = Vector3
+            .init(dir.x, 0, dir.y)
             .scale(self.speed)
             .scale(frametime)
             .add(self.force)
             .add(self.pos);
 
-        if (self.force.distance(Vector2.zero()) > 0.1) {
+        if (self.force.distance(Vector3.zero()) > 0.1) {
             self.force = self.force.scale(0.8);
         } else {
-            self.force = Vector2.zero();
+            self.force = Vector3.zero();
         }
 
-        if (rl.isKeyPressed(.key_space)) {
-            self.force = getDirection().scale(100);
+        if (rl.isKeyPressed(.key_left_shift)) {
+            self.force = Vector3
+                .init(dir.x, 0, dir.y)
+                .scale(100);
         }
     }
 
     pub fn draw(self: *Player) void {
-        rl.drawRectangleV(
-            self.pos.subtractValue(50),
-            Vector2.init(100, 100),
-            Color.ray_white,
-        );
+        rl.drawCubeV(self.pos, Vector3.one().scale(10), Color.red);
     }
 };
 
@@ -157,13 +159,26 @@ const Crosshair = struct {
 const Particle = struct {
     position: Vector3,
     direction: Vector3,
+    color: Color = Color.red,
 
-    pub fn update(self: *Particle) void {
-        self.position = self.position.add(self.direction);
+    pub fn update(self: *Particle, frametime: f32) void {
+        _ = frametime; // autofix
+        _ = self; // autofix
+        // self.position = self.direction
+        //     .scale(frametime)
+        //     .scale(100)
+        //     .add(self.position);
     }
 
     pub fn draw(self: *Particle) void {
-        rl.drawCubeV(self.position, Vector3.one(), Color.white);
+        // rl.drawCubeV(self.position, Vector3.one().scale(10), Color.white);
+        rl.drawRay(
+            .{
+                .position = self.position,
+                .direction = self.direction,
+            },
+            self.color,
+        );
     }
 };
 
@@ -216,6 +231,14 @@ pub fn main() !void {
     const target = rl.loadRenderTexture(rl.getScreenWidth(), rl.getScreenHeight());
     defer target.unload();
 
+    var player = Player{
+        .pos = Vector3.one(),
+        .force = Vector3.zero(),
+        .speed = 800,
+    };
+
+    var shake: f32 = 0;
+
     while (!rl.windowShouldClose()) {
         rl.beginDrawing();
         defer rl.endDrawing();
@@ -249,7 +272,11 @@ pub fn main() !void {
             Vector3.init(mouseDelta.x, mouseDelta.y, 0),
             0,
         );
+        camera.position = player.pos;
         rl.disableCursor();
+
+        // camera.target = camera.target.add(.{ .x = 0, .y = shake, .z = 0 });
+        // shake = shake * 0.9;
 
         // UI
         defer rl.drawFPS(0, 0);
@@ -259,21 +286,43 @@ pub fn main() !void {
         camera.begin();
         defer camera.end();
 
+        const frametime = rl.getFrameTime();
+        player.update(frametime);
+        player.draw();
+
         rl.drawGrid(100, 10);
         rl.drawPlane(Vector3.zero(), Vector2.one().scale(1000), Color.black.brightness(0.2));
         for (cubes.items) |cube| {
             rl.drawCube(cube, 30, 30, 30, Color.white);
+            rl.drawCubeWiresV(cube, Vector3.one().scale(30), Color.blue);
         }
 
         for (particles.items) |*particle| {
-            particle.update();
+            particle.update(frametime);
             particle.draw();
         }
 
         if (rl.isMouseButtonPressed(.mouse_button_left)) {
+            shake = 1;
+            var hit = false;
+
+            const ray = Ray{
+                .position = camera.target,
+                .direction = camera.target.subtract(camera.position),
+            };
+
+            for (cubes.items) |*cube| {
+                const col = rl.getRayCollisionBox(ray, .{
+                    .min = cube.subtract(Vector3.one().scale(15)),
+                    .max = cube.add(Vector3.one().scale(15)),
+                });
+                if (col.hit) hit = true;
+            }
+
             try particles.append(.{
-                .position = camera.position,
-                .direction = Vector3.one(),
+                .position = camera.target,
+                .direction = camera.target.subtract(camera.position),
+                .color = if (hit) Color.green else Color.red,
             });
         }
     }
