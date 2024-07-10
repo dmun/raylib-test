@@ -10,6 +10,7 @@ const Player = struct {
     speed: f32,
     pos: Vector3,
     force: Vector3,
+    orientation: Vector3,
 
     pub fn update(self: *Player, frametime: f32) void {
         const dir = getDirection();
@@ -182,6 +183,12 @@ const Particle = struct {
     }
 };
 
+const FpCamera = struct {
+    position: Vector3,
+    direction: Vector3,
+    fov: f32,
+};
+
 pub fn main() !void {
     rl.setConfigFlags(.{
         .msaa_4x_hint = true,
@@ -190,12 +197,10 @@ pub fn main() !void {
     rl.initWindow(1280, 720, "Test");
     rl.setTargetFPS(240);
 
-    var camera = rl.Camera3D{
+    const fpCamera = FpCamera{
         .position = Vector3.init(0, 1, 1),
-        .target = Vector3.init(0, 1, 20),
-        .up = Vector3.init(0, 1, 0),
-        .fovy = 90,
-        .projection = .camera_perspective,
+        .direction = Vector3.one(),
+        .fov = 90,
     };
 
     const crosshair = Crosshair{
@@ -235,6 +240,15 @@ pub fn main() !void {
         .pos = Vector3.one(),
         .force = Vector3.zero(),
         .speed = 800,
+        .orientation = Vector3.init(1, 0, 0),
+    };
+
+    var camera = rl.Camera3D{
+        .position = Vector3.one(),
+        .target = player.orientation,
+        .up = Vector3.init(0, 1, 0),
+        .fovy = fpCamera.fov,
+        .projection = .camera_perspective,
     };
 
     var shake: f32 = 0;
@@ -264,15 +278,17 @@ pub fn main() !void {
 
         // Camera
         const mouseDelta = rl.getMouseDelta().scale(0.05);
-        const direction = getDirection().scale(0.5);
-        camera.update(.camera_custom);
-        rl.updateCameraPro(
-            &camera,
-            Vector3.init(-direction.y, direction.x, 0),
-            Vector3.init(mouseDelta.x, mouseDelta.y, 0),
-            0,
-        );
+        player.orientation = player.orientation.rotateByAxisAngle(Vector3.init(0, 1, 0), -mouseDelta.x);
+
         camera.position = player.pos;
+        camera.target = player.pos.add(player.orientation).multiply(Vector3.init(1, 1, 1));
+
+        defer rl.drawText(rl.textFormat("x: %f", .{player.orientation.x}), 150, 0, 18, Color.white);
+        defer rl.drawText(rl.textFormat("y: %f", .{player.orientation.y}), 150, 18, 18, Color.white);
+        defer rl.drawText(rl.textFormat("z: %f", .{player.orientation.z}), 150, 36, 18, Color.white);
+
+        // camera.update(.camera_custom);
+
         rl.disableCursor();
 
         // camera.target = camera.target.add(.{ .x = 0, .y = shake, .z = 0 });
@@ -285,6 +301,8 @@ pub fn main() !void {
         // Scene
         camera.begin();
         defer camera.end();
+
+        rl.drawSphere(player.pos.add(player.orientation.scale(10)), 3, Color.blue);
 
         const frametime = rl.getFrameTime();
         player.update(frametime);
