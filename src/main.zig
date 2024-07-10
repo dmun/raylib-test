@@ -8,18 +8,18 @@ const Ray = rl.Ray;
 
 const Player = struct {
     speed: f32,
-    pos: Vector3,
+    position: Vector3,
     force: Vector3,
     orientation: Vector3,
 
     pub fn update(self: *Player, frametime: f32) void {
         const dir = getDirection();
-        self.pos = Vector3
+        self.position = Vector3
             .init(dir.x, 0, dir.y)
             .scale(self.speed)
             .scale(frametime)
             .add(self.force)
-            .add(self.pos);
+            .add(self.position);
 
         if (self.force.distance(Vector3.zero()) > 0.1) {
             self.force = self.force.scale(0.8);
@@ -35,7 +35,7 @@ const Player = struct {
     }
 
     pub fn draw(self: *Player) void {
-        rl.drawCubeV(self.pos, Vector3.one().scale(10), Color.red);
+        rl.drawCubeV(self.position, Vector3.one().scale(10), Color.red);
     }
 };
 
@@ -185,7 +185,9 @@ const Particle = struct {
 
 const FpCamera = struct {
     position: Vector3,
-    direction: Vector3,
+    target: Vector3,
+    pitch: f32,
+    yaw: f32,
     fov: f32,
 };
 
@@ -197,9 +199,11 @@ pub fn main() !void {
     rl.initWindow(1280, 720, "Test");
     rl.setTargetFPS(240);
 
-    const fpCamera = FpCamera{
+    var fpCamera = FpCamera{
         .position = Vector3.init(0, 1, 1),
-        .direction = Vector3.one(),
+        .target = Vector3.init(1, 0, 0),
+        .pitch = 0,
+        .yaw = 0,
         .fov = 90,
     };
 
@@ -237,18 +241,10 @@ pub fn main() !void {
     defer target.unload();
 
     var player = Player{
-        .pos = Vector3.one(),
+        .position = Vector3.one(),
         .force = Vector3.zero(),
         .speed = 800,
         .orientation = Vector3.init(1, 0, 0),
-    };
-
-    var camera = rl.Camera3D{
-        .position = Vector3.one(),
-        .target = player.orientation,
-        .up = Vector3.init(0, 1, 0),
-        .fovy = fpCamera.fov,
-        .projection = .camera_perspective,
     };
 
     var shake: f32 = 0;
@@ -278,16 +274,31 @@ pub fn main() !void {
 
         // Camera
         const mouseDelta = rl.getMouseDelta().scale(0.05);
-        player.orientation = player.orientation.rotateByAxisAngle(Vector3.init(0, 1, 0), -mouseDelta.x);
+        fpCamera.pitch = fpCamera.pitch + mouseDelta.y;
+        fpCamera.yaw = fpCamera.yaw + mouseDelta.x;
+        fpCamera.pitch = rl.math.clamp(fpCamera.pitch, -89, 89);
 
-        camera.position = player.pos;
-        camera.target = player.pos.add(player.orientation).multiply(Vector3.init(1, 1, 1));
+        const yaw = std.math.degreesToRadians(fpCamera.yaw);
+        const pitch = std.math.degreesToRadians(fpCamera.pitch);
 
-        defer rl.drawText(rl.textFormat("x: %f", .{player.orientation.x}), 150, 0, 18, Color.white);
-        defer rl.drawText(rl.textFormat("y: %f", .{player.orientation.y}), 150, 18, 18, Color.white);
-        defer rl.drawText(rl.textFormat("z: %f", .{player.orientation.z}), 150, 36, 18, Color.white);
+        fpCamera.target.x = -@cos(yaw) * @cos(pitch);
+        fpCamera.target.z = -@sin(yaw) * @cos(pitch);
+        fpCamera.target.y = -@sin(pitch);
 
-        // camera.update(.camera_custom);
+        fpCamera.position = player.position;
+
+        var camera = rl.Camera3D{
+            .position = fpCamera.position,
+            .target = fpCamera.position.add(fpCamera.target),
+            .up = Vector3.init(0, 1, 0),
+            .fovy = fpCamera.fov,
+            .projection = .camera_perspective,
+        };
+
+        defer rl.drawText(rl.textFormat("pitch: %f", .{fpCamera.pitch}), 150, 0, 18, Color.white);
+        defer rl.drawText(rl.textFormat("yaw: %f", .{fpCamera.yaw}), 150, 18, 18, Color.white);
+
+        camera.update(.camera_custom);
 
         rl.disableCursor();
 
@@ -302,7 +313,7 @@ pub fn main() !void {
         camera.begin();
         defer camera.end();
 
-        rl.drawSphere(player.pos.add(player.orientation.scale(10)), 3, Color.blue);
+        rl.drawSphere(player.position.add(player.orientation.scale(10)), 3, Color.blue);
 
         const frametime = rl.getFrameTime();
         player.update(frametime);
