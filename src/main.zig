@@ -42,6 +42,13 @@ const Player = struct {
             }
             self.force = v.scale(20);
         }
+
+        if (rl.isKeyPressed(.key_space)) {
+            self.force = Vector3
+                .init(0, 1, 0)
+                .scale(20)
+                .add(self.force);
+        }
     }
 
     pub fn draw(self: *Player) void {
@@ -171,14 +178,14 @@ const Crosshair = struct {
 const Particle = struct {
     position: Vector3,
     direction: Vector3,
+    lifetime: f32,
     color: Color = Color.red,
 
     pub fn update(self: *Particle, frametime: f32) void {
-        _ = frametime; // autofix
-        _ = self; // autofix
+        self.lifetime -= frametime;
         // self.position = self.direction
         //     .scale(frametime)
-        //     .scale(100)
+        //     .scale(1000)
         //     .add(self.position);
     }
 
@@ -252,7 +259,7 @@ pub fn main() !void {
     defer target.unload();
 
     var player = Player{
-        .position = Vector3.one(),
+        .position = Vector3.init(0, 10, 0),
         .force = Vector3.zero(),
         .speed = 200,
         .target = Vector3.init(1, 0, 0),
@@ -336,12 +343,15 @@ pub fn main() !void {
             rl.drawCubeWiresV(cube, Vector3.one().scale(30), Color.blue);
         }
 
-        for (particles.items) |*particle| {
+        for (particles.items, 0..) |*particle, i| {
             particle.update(frametime);
+            if (particle.lifetime < 0) {
+                _ = particles.swapRemove(i);
+            }
             particle.draw();
         }
 
-        if (rl.isMouseButtonPressed(.mouse_button_left)) {
+        if (rl.isMouseButtonDown(.mouse_button_left)) {
             shake = 1;
             var hit = false;
 
@@ -361,6 +371,7 @@ pub fn main() !void {
             try particles.append(.{
                 .position = camera.target,
                 .direction = camera.target.subtract(camera.position),
+                .lifetime = 2,
                 .color = if (hit) Color.green else Color.red,
             });
         }
