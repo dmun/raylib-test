@@ -10,12 +10,20 @@ const Player = struct {
     speed: f32,
     position: Vector3,
     force: Vector3,
-    orientation: Vector3,
+    target: Vector3,
 
     pub fn update(self: *Player, frametime: f32) void {
         const dir = getDirection();
-        self.position = Vector3
-            .init(dir.x, 0, dir.y)
+        var v = Vector3.zero();
+
+        if (rl.isKeyDown(.key_w)) v = v.add(self.target);
+        if (rl.isKeyDown(.key_s)) v = v.subtract(self.target);
+        if (rl.isKeyDown(.key_a)) v = v.add(self.target.rotateByAxisAngle(Vector3.init(0, 1, 0), std.math.degreesToRadians(90)));
+        if (rl.isKeyDown(.key_d)) v = v.subtract(self.target.rotateByAxisAngle(Vector3.init(0, 1, 0), std.math.degreesToRadians(90)));
+
+        v.y = 0;
+
+        self.position = v
             .scale(self.speed)
             .scale(frametime)
             .add(self.force)
@@ -243,8 +251,8 @@ pub fn main() !void {
     var player = Player{
         .position = Vector3.one(),
         .force = Vector3.zero(),
-        .speed = 800,
-        .orientation = Vector3.init(1, 0, 0),
+        .speed = 200,
+        .target = Vector3.init(1, 0, 0),
     };
 
     var shake: f32 = 0;
@@ -284,6 +292,7 @@ pub fn main() !void {
         fpCamera.target.x = -@cos(yaw) * @cos(pitch);
         fpCamera.target.z = -@sin(yaw) * @cos(pitch);
         fpCamera.target.y = -@sin(pitch);
+        player.target = fpCamera.target;
 
         fpCamera.position = player.position;
 
@@ -312,8 +321,6 @@ pub fn main() !void {
         // Scene
         camera.begin();
         defer camera.end();
-
-        rl.drawSphere(player.position.add(player.orientation.scale(10)), 3, Color.blue);
 
         const frametime = rl.getFrameTime();
         player.update(frametime);
