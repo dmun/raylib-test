@@ -13,7 +13,6 @@ const Player = struct {
     target: Vector3,
 
     pub fn update(self: *Player, frametime: f32) void {
-        const dir = getDirection();
         var v = Vector3.zero();
 
         if (rl.isKeyDown(.key_w)) v = v.add(self.target);
@@ -22,7 +21,6 @@ const Player = struct {
         if (rl.isKeyDown(.key_d)) v = v.subtract(self.target.rotateByAxisAngle(Vector3.init(0, 1, 0), std.math.degreesToRadians(90)));
 
         v.y = 0;
-
         v = v.normalize();
 
         self.position = v
@@ -38,14 +36,17 @@ const Player = struct {
         }
 
         if (rl.isKeyPressed(.key_left_shift)) {
-            self.force = Vector3
-                .init(dir.x, 0, dir.y)
-                .scale(100);
+            if (v.lengthSqr() == 0) {
+                v = v.add(self.target);
+                v.y = 0;
+            }
+            self.force = v.scale(20);
         }
     }
 
     pub fn draw(self: *Player) void {
-        rl.drawCubeV(self.position, Vector3.one().scale(10), Color.red);
+        _ = self; // autofix
+        // rl.drawCubeV(self.position, Vector3.one().scale(10), Color.red);
     }
 };
 
