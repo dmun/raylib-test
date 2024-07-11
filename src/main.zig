@@ -23,6 +23,8 @@ const Player = struct {
 
         v.y = 0;
 
+        v = v.normalize();
+
         self.position = v
             .scale(self.speed)
             .scale(frametime)
